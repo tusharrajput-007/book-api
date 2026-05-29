@@ -25,6 +25,15 @@ app.register(cors, { origin: "http://localhost:5173" });
 // error handler
 app.setErrorHandler(errorHandler);
 
+// Not found handler
+app.setNotFoundHandler((request, reply) => {
+  request.log.warn({ url: request.url }, "route not found");
+  return reply.code(404).send({
+    success: false,
+    message: "Not found",
+  });
+});
+
 // Health check route
 app.get("/health", async (request, reply) => {
   return { status: "ok" };
