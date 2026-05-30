@@ -1,33 +1,60 @@
-import { Book, BookBody } from "../schemas/book.schema";
-
-// In-memory database
-const bookMap = new Map<number, Book>();
-let nextId = 1;
+import prisma from "../lib/prisma";
+import { BookBody, BookQuery } from "../schemas/book.schema";
+import { getPaginationParams, buildMeta } from "../utils/pagination";
 
 export const bookService = {
-  findAll(): Book[] {
-    return Array.from(bookMap.values());
+  async findAll(query: BookQuery) {
+    const { page, limit, search } = query;
+    const { skip, take } = getPaginationParams(page, limit);
+
+    // where clause for search
+    const where = search
+      ? {
+          bookName: {
+            contains: search,
+          },
+        }
+      : {};
+
+    // both queries simultaneously
+    const [books, total] = await Promise.all([
+      prisma.book.findMany({
+        where,
+        skip,
+        take,
+        orderBy: { createdAt: "desc" },
+      }),
+      prisma.book.count({ where }),
+    ]);
+
+    return {
+      data: books,
+      meta: buildMeta(page, limit, total),
+    };
   },
 
-  findById(id: number): Book | undefined {
-    return bookMap.get(id);
+  async findById(id: number) {
+    return prisma.book.findUnique({
+      where: { id },
+    });
   },
 
-  create(data: BookBody): Book {
-    const book: Book = { id: nextId++, ...data };
-    bookMap.set(book.id, book);
-    return book;
+  async create(data: BookBody) {
+    return prisma.book.create({
+      data,
+    });
   },
 
-  update(id: number, data: BookBody): Book | undefined {
-    const existing = bookMap.get(id);
-    if (!existing) return undefined;
-    const updated: Book = { ...existing, ...data };
-    bookMap.set(id, updated);
-    return updated;
+  async update(id: number, data: BookBody) {
+    return prisma.book.update({
+      where: { id },
+      data,
+    });
   },
 
-  delete(id: number): boolean {
-    return bookMap.delete(id);
+  async delete(id: number) {
+    return prisma.book.delete({
+      where: { id },
+    });
   },
 };

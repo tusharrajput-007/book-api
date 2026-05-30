@@ -5,6 +5,7 @@ import {
   bookBodySchema,
   bookParamSchema,
   bookSchema,
+  bookQuerySchema,
 } from "../schemas/book.schema";
 import { z } from "zod";
 
@@ -16,7 +17,18 @@ export const bookRoutes: FastifyPluginAsync = async (app) => {
     "/",
     {
       schema: {
-        response: { 200: z.object({ data: z.array(bookSchema) }) },
+        querystring: bookQuerySchema,
+        response: {
+          200: z.object({
+            data: z.array(bookSchema),
+            meta: z.object({
+              page: z.number(),
+              limit: z.number(),
+              total: z.number(),
+              totalPages: z.number(),
+            }),
+          }),
+        },
       },
     },
     bookController.getAll,

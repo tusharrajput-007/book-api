@@ -1,6 +1,6 @@
 import { FastifyRequest, FastifyReply } from "fastify";
 import { bookService } from "../services/book.service";
-import { BookBody, BookParam } from "../schemas/book.schema";
+import { BookBody, BookParam, BookQuery } from "../schemas/book.schema";
 import { createModuleLogger } from "../utils/logger";
 
 const listLogger = createModuleLogger("book-list");
@@ -10,17 +10,23 @@ const updateLogger = createModuleLogger("book-update");
 const deleteLogger = createModuleLogger("book-delete");
 
 export const bookController = {
-  async getAll(request: FastifyRequest, reply: FastifyReply) {
-    const books = bookService.findAll();
-    listLogger.info({ count: books.length }, "fetched all books");
-    return reply.send({ data: books });
+  async getAll(
+    request: FastifyRequest<{ Querystring: BookQuery }>,
+    reply: FastifyReply,
+  ) {
+    const result = await bookService.findAll(request.query);
+    listLogger.info(
+      { count: result.data.length, page: result.meta.page },
+      "fetched all books",
+    );
+    return reply.send(result);
   },
 
   async getById(
     request: FastifyRequest<{ Params: BookParam }>,
     reply: FastifyReply,
   ) {
-    const book = bookService.findById(request.params.id);
+    const book = await bookService.findById(request.params.id);
     if (!book) {
       getByIdLogger.warn({ id: request.params.id }, "book not found");
       return reply.code(404).send({ success: false, message: "Not found" });
@@ -33,7 +39,7 @@ export const bookController = {
     request: FastifyRequest<{ Body: BookBody }>,
     reply: FastifyReply,
   ) {
-    const book = bookService.create(request.body);
+    const book = await bookService.create(request.body);
     createLogger.info(
       { bookId: book.id, authorName: book.authorName },
       "book created",
@@ -45,7 +51,7 @@ export const bookController = {
     request: FastifyRequest<{ Params: BookParam; Body: BookBody }>,
     reply: FastifyReply,
   ) {
-    const book = bookService.update(request.params.id, request.body);
+    const book = await bookService.update(request.params.id, request.body);
     if (!book) {
       updateLogger.warn({ id: request.params.id }, "book not found for update");
       return reply.code(404).send({ success: false, message: "Not found" });
@@ -58,11 +64,7 @@ export const bookController = {
     request: FastifyRequest<{ Params: BookParam }>,
     reply: FastifyReply,
   ) {
-    const deleted = bookService.delete(request.params.id);
-    if (!deleted) {
-      deleteLogger.warn({ id: request.params.id }, "book not found for delete");
-      return reply.code(404).send({ success: false, message: "Not found" });
-    }
+    await bookService.delete(request.params.id);
     deleteLogger.info({ bookId: request.params.id }, "book deleted");
     return reply.code(204).send();
   },
