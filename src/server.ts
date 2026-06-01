@@ -1,6 +1,7 @@
 import "dotenv/config";
 import Fastify from "fastify";
 import cors from "@fastify/cors";
+import jwt from "@fastify/jwt";
 import {
   serializerCompiler,
   validatorCompiler,
@@ -9,6 +10,7 @@ import {
 import { env } from "./config/env";
 import { loggerConfig } from "./plugins/logger";
 import { errorHandler } from "./plugins/errorHandler";
+import { authRoutes } from "./routes/auth.routes";
 import { bookRoutes } from "./routes/book.routes";
 
 const app = Fastify({
@@ -20,7 +22,15 @@ app.setValidatorCompiler(validatorCompiler);
 app.setSerializerCompiler(serializerCompiler);
 
 // plugins
-app.register(cors, { origin: "http://localhost:5173" });
+app.register(cors, {
+  origin: "http://localhost:5173",
+  allowedHeaders: ["Authorization", "Content-Type"],
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
+  exposedHeaders: ["Content-Disposition"],
+});
+
+// register jwt plugin with secret
+app.register(jwt, { secret: env.JWT_SECRET });
 
 // error handler
 app.setErrorHandler(errorHandler);
@@ -40,6 +50,7 @@ app.get("/health", async (request, reply) => {
 });
 
 // registering routes
+app.register(authRoutes, { prefix: "/auth" });
 app.register(bookRoutes, { prefix: "/books" });
 
 // Start server

@@ -3,11 +3,11 @@ import { bookService } from "../services/book.service";
 import { BookBody, BookParam, BookQuery } from "../schemas/book.schema";
 import { createModuleLogger } from "../utils/logger";
 
-const listLogger = createModuleLogger("book-list");
-const getByIdLogger = createModuleLogger("book-getbyid");
-const createLogger = createModuleLogger("book-create");
-const updateLogger = createModuleLogger("book-update");
-const deleteLogger = createModuleLogger("book-delete");
+const listLogger = createModuleLogger("books/book-list");
+const getByIdLogger = createModuleLogger("books/book-getbyid");
+const createLogger = createModuleLogger("books/book-create");
+const updateLogger = createModuleLogger("books/book-update");
+const deleteLogger = createModuleLogger("books/book-delete");
 
 export const bookController = {
   async getAll(

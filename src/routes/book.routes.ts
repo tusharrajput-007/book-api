@@ -7,6 +7,7 @@ import {
   bookSchema,
   bookQuerySchema,
 } from "../schemas/book.schema";
+import { authenticate } from "../plugins/authenticate";
 import { z } from "zod";
 
 export const bookRoutes: FastifyPluginAsync = async (app) => {
@@ -16,6 +17,7 @@ export const bookRoutes: FastifyPluginAsync = async (app) => {
   server.get(
     "/",
     {
+      preHandler: authenticate,
       schema: {
         querystring: bookQuerySchema,
         response: {
@@ -38,6 +40,7 @@ export const bookRoutes: FastifyPluginAsync = async (app) => {
   server.get(
     "/:id",
     {
+      preHandler: authenticate,
       schema: {
         params: bookParamSchema,
         response: { 200: z.object({ data: bookSchema }) },
@@ -50,6 +53,7 @@ export const bookRoutes: FastifyPluginAsync = async (app) => {
   server.post(
     "/",
     {
+      preHandler: authenticate,
       schema: {
         body: bookBodySchema,
         response: { 201: z.object({ data: bookSchema }) },
@@ -62,6 +66,7 @@ export const bookRoutes: FastifyPluginAsync = async (app) => {
   server.put(
     "/:id",
     {
+      preHandler: authenticate,
       schema: {
         params: bookParamSchema,
         body: bookBodySchema,
@@ -75,6 +80,7 @@ export const bookRoutes: FastifyPluginAsync = async (app) => {
   server.delete(
     "/:id",
     {
+      preHandler: authenticate,
       schema: {
         params: bookParamSchema,
         response: { 204: z.object({}) },
