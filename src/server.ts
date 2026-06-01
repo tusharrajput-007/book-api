@@ -12,6 +12,8 @@ import { loggerConfig } from "./plugins/logger";
 import { errorHandler } from "./plugins/errorHandler";
 import { authRoutes } from "./routes/auth.routes";
 import { bookRoutes } from "./routes/book.routes";
+import { studentRoutes } from "./routes/student.routes";
+import { issueRoutes } from "./routes/issue.routes";
 
 const app = Fastify({
   logger: loggerConfig,
@@ -52,6 +54,8 @@ app.get("/health", async (request, reply) => {
 // registering routes
 app.register(authRoutes, { prefix: "/auth" });
 app.register(bookRoutes, { prefix: "/books" });
+app.register(studentRoutes, { prefix: "/students" });
+app.register(issueRoutes, { prefix: "/issues" });
 
 // Start server
 const start = async () => {
