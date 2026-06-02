@@ -8,6 +8,7 @@ const envSchema = z.object({
     .default("development"),
   DATABASE_URL: z.string().min(1),
   JWT_SECRET: z.string().min(32),
+  JWT_EXPIRES_IN: z.string().default("7d"),
   GOOGLE_CLIENT_ID: z.string().min(1),
   GOOGLE_CLIENT_SECRET: z.string().min(1),
   GOOGLE_CALLBACK_URL: z.string().min(1),

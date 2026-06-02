@@ -37,7 +37,7 @@ export const authController = {
     // Sign JWT token
     const token = await request.server.jwt.sign(
       { sub: user.id },
-      { expiresIn: "7d" },
+      { expiresIn: env.JWT_EXPIRES_IN },
     );
 
     loginLogger.info({ userId: user.id }, "user logged in");
@@ -92,7 +92,7 @@ export const authController = {
       // sign JWT
       const jwtToken = await request.server.jwt.sign(
         { sub: user.id },
-        { expiresIn: "7d" },
+        { expiresIn: env.JWT_EXPIRES_IN },
       );
 
       // redirect to frontend with token
