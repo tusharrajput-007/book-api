@@ -1,3 +1,4 @@
+import { env } from "../config/env";
 import { FastifyRequest, FastifyReply } from "fastify";
 import { authService } from "../services/auth.service";
 import { RegisterBody, LoginBody } from "../schemas/auth.schema";
@@ -62,5 +63,44 @@ export const authController = {
     }
     meLogger.info({ userId: user.id }, "fetched current user");
     return reply.send({ data: user });
+  },
+
+  async googleCallback(request: FastifyRequest, reply: FastifyReply) {
+    try {
+      // exchange code for token
+      const { token } = await (
+        request.server as any
+      ).googleOAuth2.getAccessTokenFromAuthorizationCodeFlow(request);
+
+      // fetch user info from Google
+      const userInfoResponse = await fetch(
+        "https://www.googleapis.com/oauth2/v3/userinfo",
+        {
+          headers: { Authorization: `Bearer ${token.access_token}` },
+        },
+      );
+      const userInfo = (await userInfoResponse.json()) as any;
+
+      // find or create user
+      const user = await authService.findOrCreateGoogleUser(
+        userInfo.sub,
+        userInfo.email,
+        userInfo.given_name,
+        userInfo.family_name ?? "",
+      );
+
+      // sign JWT
+      const jwtToken = await request.server.jwt.sign(
+        { sub: user.id },
+        { expiresIn: "7d" },
+      );
+
+      // redirect to frontend with token
+      return reply.redirect(
+        `${env.FRONTEND_URL}/auth/callback?token=${jwtToken}`,
+      );
+    } catch (err) {
+      return reply.redirect(`${env.FRONTEND_URL}/login?error=oauth_failed`);
+    }
   },
 };

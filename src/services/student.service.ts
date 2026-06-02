@@ -39,16 +39,23 @@ export const studentService = {
     });
   },
 
-  async create(data: StudentBody) {
+  async create(data: StudentBody, photoFile?: string) {
     return prisma.student.create({
-      data,
+      data: {
+        ...data,
+        photoFile: photoFile ?? null,
+      },
     });
   },
 
-  async update(id: number, data: StudentBody) {
+  async update(id: number, data: StudentBody, photoFile?: string) {
     return prisma.student.update({
       where: { id },
-      data,
+      data: {
+        ...data,
+        // only update photoFile if a new file was provided, otherwise keep existing
+        ...(photoFile !== undefined && { photoFile }),
+      },
     });
   },
 

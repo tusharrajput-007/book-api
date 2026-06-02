@@ -2,7 +2,6 @@ import { FastifyPluginAsync } from "fastify";
 import { ZodTypeProvider } from "fastify-type-provider-zod";
 import { studentController } from "../controllers/student.controller";
 import {
-  studentBodySchema,
   studentParamSchema,
   studentSchema,
   studentQuerySchema,
@@ -49,28 +48,33 @@ export const studentRoutes: FastifyPluginAsync = async (app) => {
     studentController.getById,
   );
 
-  // POST /students
+  // GET /students/:id/photo - public
+  server.get(
+    "/:id/photo",
+    {
+      schema: {
+        params: studentParamSchema,
+      },
+    },
+    studentController.getPhoto,
+  );
+
+  // POST /students - multipart, no body schema
   server.post(
     "/",
     {
       preHandler: authenticate,
-      schema: {
-        body: studentBodySchema,
-        response: { 201: z.object({ data: studentSchema }) },
-      },
     },
     studentController.create,
   );
 
-  // PUT /students/:id
+  // PUT /students/:id - multipart, no body schema
   server.put(
     "/:id",
     {
       preHandler: authenticate,
       schema: {
         params: studentParamSchema,
-        body: studentBodySchema,
-        response: { 200: z.object({ data: studentSchema }) },
       },
     },
     studentController.update,

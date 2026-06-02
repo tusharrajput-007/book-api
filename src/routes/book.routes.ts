@@ -2,7 +2,6 @@ import { FastifyPluginAsync } from "fastify";
 import { ZodTypeProvider } from "fastify-type-provider-zod";
 import { bookController } from "../controllers/book.controller";
 import {
-  bookBodySchema,
   bookParamSchema,
   bookSchema,
   bookQuerySchema,
@@ -36,6 +35,46 @@ export const bookRoutes: FastifyPluginAsync = async (app) => {
     bookController.getAll,
   );
 
+  // GET /books/export.xlsx
+  server.get(
+    "/export.xlsx",
+    {
+      preHandler: authenticate,
+      schema: {
+        querystring: z.object({
+          search: z.string().optional(),
+        }),
+      },
+    },
+    bookController.exportXlsx,
+  );
+
+  // GET /books/export.csv
+  server.get(
+    "/export.csv",
+    {
+      preHandler: authenticate,
+      schema: {
+        querystring: z.object({
+          search: z.string().optional(),
+        }),
+      },
+    },
+    bookController.exportCsv,
+  );
+
+  // GET /books/:id/details.pdf
+  server.get(
+    "/:id/details.pdf",
+    {
+      preHandler: authenticate,
+      schema: {
+        params: bookParamSchema,
+      },
+    },
+    bookController.exportPdf,
+  );
+
   // GET /books/:id
   server.get(
     "/:id",
@@ -49,28 +88,33 @@ export const bookRoutes: FastifyPluginAsync = async (app) => {
     bookController.getById,
   );
 
-  // POST /books
+  // GET /books/:id/cover
+  server.get(
+    "/:id/cover",
+    {
+      schema: {
+        params: bookParamSchema,
+      },
+    },
+    bookController.getCover,
+  );
+
+  // POST /books - multipart, no body schema
   server.post(
     "/",
     {
       preHandler: authenticate,
-      schema: {
-        body: bookBodySchema,
-        response: { 201: z.object({ data: bookSchema }) },
-      },
     },
     bookController.create,
   );
 
-  // PUT /books/:id
+  // PUT /books/:id - multipart
   server.put(
     "/:id",
     {
       preHandler: authenticate,
       schema: {
         params: bookParamSchema,
-        body: bookBodySchema,
-        response: { 200: z.object({ data: bookSchema }) },
       },
     },
     bookController.update,

@@ -39,16 +39,32 @@ export const bookService = {
     });
   },
 
-  async create(data: BookBody) {
-    return prisma.book.create({
-      data,
+  async findAllForExport(search?: string) {
+    const where = search ? { bookName: { contains: search } } : {};
+
+    return prisma.book.findMany({
+      where,
+      orderBy: { createdAt: "desc" },
     });
   },
 
-  async update(id: number, data: BookBody) {
+  async create(data: BookBody, coverFile?: string) {
+    return prisma.book.create({
+      data: {
+        ...data,
+        coverFile: coverFile ?? null,
+      },
+    });
+  },
+
+  async update(id: number, data: BookBody, coverFile?: string) {
     return prisma.book.update({
       where: { id },
-      data,
+      data: {
+        ...data,
+        // only update coverFile if a new file was provided, otherwise keep existing
+        ...(coverFile !== undefined && { coverFile }),
+      },
     });
   },
 

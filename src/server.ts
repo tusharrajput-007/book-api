@@ -14,6 +14,8 @@ import { authRoutes } from "./routes/auth.routes";
 import { bookRoutes } from "./routes/book.routes";
 import { studentRoutes } from "./routes/student.routes";
 import { issueRoutes } from "./routes/issue.routes";
+import multipart from "@fastify/multipart";
+import oauth2 from "@fastify/oauth2";
 
 const app = Fastify({
   logger: loggerConfig,
@@ -33,6 +35,33 @@ app.register(cors, {
 
 // register jwt plugin with secret
 app.register(jwt, { secret: env.JWT_SECRET });
+
+// register google oauth2 plugin
+app.register(oauth2, {
+  name: "googleOAuth2",
+  scope: ["profile", "email"],
+  credentials: {
+    client: {
+      id: env.GOOGLE_CLIENT_ID,
+      secret: env.GOOGLE_CLIENT_SECRET,
+    },
+    auth: {
+      authorizeHost: "https://accounts.google.com",
+      authorizePath: "/o/oauth2/auth",
+      tokenHost: "https://oauth2.googleapis.com",
+      tokenPath: "/token",
+    },
+  },
+  startRedirectPath: "/auth/google",
+  callbackUri: env.GOOGLE_CALLBACK_URL,
+});
+
+// register multipart for file uploads
+app.register(multipart, {
+  limits: {
+    fileSize: 10 * 1024 * 1024,
+  },
+});
 
 // error handler
 app.setErrorHandler(errorHandler);

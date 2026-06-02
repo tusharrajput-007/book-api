@@ -17,7 +17,9 @@ export const errorHandler = (
   if (
     customErr.statusCode &&
     customErr.message &&
-    (customErr.statusCode === 404 || customErr.statusCode === 409)
+    (customErr.statusCode === 400 ||
+      customErr.statusCode === 404 ||
+      customErr.statusCode === 409)
   ) {
     return reply.code(customErr.statusCode).send({
       success: false,

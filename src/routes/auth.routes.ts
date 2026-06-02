@@ -58,4 +58,13 @@ export const authRoutes: FastifyPluginAsync = async (app) => {
     },
     authController.me,
   );
+
+  // GET /auth/google/callback - google redirects here after user approves
+  server.get(
+    "/google/callback",
+    {
+      schema: {},
+    },
+    authController.googleCallback,
+  );
 };

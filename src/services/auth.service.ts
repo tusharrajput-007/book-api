@@ -53,4 +53,43 @@ export const authService = {
       },
     });
   },
+
+  async findOrCreateGoogleUser(
+    googleId: string,
+    email: string,
+    firstName: string,
+    lastName: string,
+  ) {
+    // check if user exists by email
+    const existing = await prisma.user.findUnique({
+      where: { email },
+    });
+
+    if (existing) {
+      // update googleId if not set
+      if (!existing.googleId) {
+        await prisma.user.update({
+          where: { id: existing.id },
+          data: { googleId },
+        });
+      }
+      return existing;
+    }
+
+    // create new user
+    const username = email.split("@")[0];
+    const randomPassword = Math.random().toString(36).slice(-8);
+    const passwordHash = await bcrypt.hash(randomPassword, 10);
+
+    return prisma.user.create({
+      data: {
+        firstName,
+        lastName,
+        email,
+        username,
+        passwordHash,
+        googleId,
+      },
+    });
+  },
 };

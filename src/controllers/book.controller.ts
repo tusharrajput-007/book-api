@@ -1,7 +1,8 @@
 import { FastifyRequest, FastifyReply } from "fastify";
 import { bookService } from "../services/book.service";
-import { BookBody, BookParam, BookQuery } from "../schemas/book.schema";
+import { BookParam, BookQuery } from "../schemas/book.schema";
 import { createModuleLogger } from "../utils/logger";
+import { saveFile, deleteFile } from "../utils/fileUpload";
 
 const listLogger = createModuleLogger("books/book-list");
 const getByIdLogger = createModuleLogger("books/book-getbyid");
@@ -35,11 +36,227 @@ export const bookController = {
     return reply.send({ data: book });
   },
 
-  async create(
-    request: FastifyRequest<{ Body: BookBody }>,
+  async getCover(
+    request: FastifyRequest<{ Params: BookParam }>,
     reply: FastifyReply,
   ) {
-    const book = await bookService.create(request.body);
+    const book = await bookService.findById(request.params.id);
+    if (!book) {
+      return reply.code(404).send({ success: false, message: "Not found" });
+    }
+    if (!book.coverFile) {
+      return reply
+        .code(404)
+        .send({ success: false, message: "This book has no cover" });
+    }
+
+    const { createReadStream } = await import("fs");
+    const { extname } = await import("path");
+
+    const ext = extname(book.coverFile);
+    const filename = `${book.bookName}${ext}`;
+
+    reply.header("Content-Disposition", `inline; filename="${filename}"`);
+    reply.header("Content-Type", ext === ".png" ? "image/png" : "image/jpeg");
+
+    return reply.send(createReadStream(book.coverFile));
+  },
+
+  async exportXlsx(
+    request: FastifyRequest<{ Querystring: { search?: string } }>,
+    reply: FastifyReply,
+  ) {
+    const { search } = request.query;
+    const books = await bookService.findAllForExport(search);
+
+    const ExcelJS = await import("exceljs");
+    const workbook = new ExcelJS.default.Workbook();
+    const sheet = workbook.addWorksheet("Books");
+
+    // define columns
+    sheet.columns = [
+      { header: "Id", key: "id", width: 10 },
+      { header: "Book Name", key: "bookName", width: 30 },
+      { header: "Author Name", key: "authorName", width: 30 },
+      { header: "ISBN", key: "isbn", width: 20 },
+      { header: "Created At", key: "createdAt", width: 25 },
+    ];
+
+    // add rows
+    sheet.addRows(
+      books.map((book: any) => ({
+        id: book.id,
+        bookName: book.bookName,
+        authorName: book.authorName,
+        isbn: book.isbn,
+        createdAt: book.createdAt.toISOString(),
+      })),
+    );
+
+    // response headers
+    reply.header(
+      "Content-Type",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    );
+    reply.header("Content-Disposition", 'attachment; filename="books.xlsx"');
+
+    // // stream workbook to response
+    // await workbook.xlsx.write(reply.raw);
+    // reply.raw.end();
+    const buffer = await workbook.xlsx.writeBuffer();
+    return reply.send(buffer);
+  },
+
+  async exportCsv(
+    request: FastifyRequest<{ Querystring: { search?: string } }>,
+    reply: FastifyReply,
+  ) {
+    const { search } = request.query;
+    const books = await bookService.findAllForExport(search);
+
+    const { Stringifier } = await import("csv-stringify");
+    const { PassThrough } = await import("stream");
+
+    reply.header("Content-Type", "text/csv; charset=utf-8");
+    reply.header("Content-Disposition", 'attachment; filename="books.csv"');
+
+    const pass = new PassThrough();
+    const stringifier = new Stringifier({
+      header: true,
+      columns: ["Id", "Book Name", "Author Name", "ISBN", "Created At"],
+    });
+
+    // pipe stringifier through passthrough to reply
+    stringifier.pipe(pass);
+
+    // write each book as a row
+    books.forEach((book: any) => {
+      stringifier.write({
+        Id: book.id,
+        "Book Name": book.bookName,
+        "Author Name": book.authorName,
+        ISBN: book.isbn,
+        "Created At": book.createdAt.toISOString(),
+      });
+    });
+
+    stringifier.end();
+
+    return reply.send(pass);
+  },
+
+  async exportPdf(
+    request: FastifyRequest<{ Params: BookParam }>,
+    reply: FastifyReply,
+  ) {
+    const book = await bookService.findById(request.params.id);
+    if (!book) {
+      return reply.code(404).send({ success: false, message: "Not found" });
+    }
+
+    const PDFDocument = (await import("pdfkit")).default;
+    const doc = new PDFDocument({ size: "A4", margin: 50 });
+
+    reply.header("Content-Type", "application/pdf");
+    reply.header(
+      "Content-Disposition",
+      `attachment; filename="book-${book.id}.pdf"`,
+    );
+
+    // collect PDF into buffer
+    const chunks: Buffer[] = [];
+    doc.on("data", (chunk: Buffer) => chunks.push(chunk));
+
+    await new Promise<void>((resolve, reject) => {
+      doc.on("end", resolve);
+      doc.on("error", reject);
+
+      // title
+      doc
+        .fontSize(24)
+        .font("Helvetica-Bold")
+        .text("BOOK DETAILS", { align: "center" })
+        .moveDown();
+
+      // divider line
+      doc.moveTo(50, doc.y).lineTo(545, doc.y).stroke().moveDown();
+
+      // cover image if exists
+      if (book.coverFile) {
+        const pageWidth = 595;
+        const imgWidth = 200;
+        const imgX = (pageWidth - imgWidth) / 2;
+        doc.image(book.coverFile, imgX, doc.y, { width: 200, height: 300 });
+        doc.moveDown(18);
+      }
+
+      // divider line
+      doc.moveTo(50, doc.y).lineTo(545, doc.y).stroke().moveDown();
+
+      // book details
+      doc.fontSize(12).font("Helvetica");
+
+      doc.font("Helvetica-Bold").text("Book Name: ", { continued: true });
+      doc.font("Helvetica").text(book.bookName).moveDown(0.5);
+
+      doc.font("Helvetica-Bold").text("Author: ", { continued: true });
+      doc.font("Helvetica").text(book.authorName).moveDown(0.5);
+
+      doc.font("Helvetica-Bold").text("ISBN: ", { continued: true });
+      doc.font("Helvetica").text(book.isbn).moveDown(0.5);
+
+      doc.font("Helvetica-Bold").text("Created At: ", { continued: true });
+      doc.font("Helvetica").text(book.createdAt.toISOString().split("T")[0]);
+
+      doc.end();
+    });
+
+    const buffer = Buffer.concat(chunks);
+    return reply.send(buffer);
+  },
+
+  async create(request: FastifyRequest, reply: FastifyReply) {
+    const fields: Record<string, string> = {};
+    let coverFile: string | undefined;
+
+    // iterate over all multipart parts
+    for await (const part of request.parts()) {
+      if (part.type === "file") {
+        // only process if a file was actually selected
+        if (part.fieldname === "coverImage" && part.filename) {
+          coverFile = await saveFile(part, "books");
+        } else {
+          // drain empty file fields to prevent hanging
+          await part.toBuffer();
+        }
+      } else {
+        fields[part.fieldname] = part.value as string;
+      }
+    }
+
+    // validate required fields
+    if (!fields.bookName || !fields.authorName || !fields.isbn) {
+      return reply.code(400).send({
+        success: false,
+        message: "Validation failed",
+        errors: [
+          {
+            field: "body",
+            message: "bookName, authorName and isbn are required",
+          },
+        ],
+      });
+    }
+
+    const book = await bookService.create(
+      {
+        bookName: fields.bookName,
+        authorName: fields.authorName,
+        isbn: fields.isbn,
+      },
+      coverFile,
+    );
+
     createLogger.info(
       { bookId: book.id, authorName: book.authorName },
       "book created",
@@ -48,14 +265,60 @@ export const bookController = {
   },
 
   async update(
-    request: FastifyRequest<{ Params: BookParam; Body: BookBody }>,
+    request: FastifyRequest<{ Params: BookParam }>,
     reply: FastifyReply,
   ) {
-    const book = await bookService.update(request.params.id, request.body);
-    if (!book) {
-      updateLogger.warn({ id: request.params.id }, "book not found for update");
+    const { id } = request.params;
+
+    // check if book exists
+    const existing = await bookService.findById(id);
+    if (!existing) {
+      updateLogger.warn({ id }, "book not found for update");
       return reply.code(404).send({ success: false, message: "Not found" });
     }
+
+    const fields: Record<string, string> = {};
+    let coverFile: string | undefined;
+
+    // iterate over all multipart parts
+    for await (const part of request.parts()) {
+      if (part.type === "file") {
+        if (part.fieldname === "coverImage" && part.filename) {
+          // delete old cover if exists
+          if (existing.coverFile) await deleteFile(existing.coverFile);
+          coverFile = await saveFile(part, "books");
+        } else {
+          await part.toBuffer();
+        }
+      } else {
+        fields[part.fieldname] = part.value as string;
+      }
+    }
+
+    // validate required fields
+    if (!fields.bookName || !fields.authorName || !fields.isbn) {
+      return reply.code(400).send({
+        success: false,
+        message: "Validation failed",
+        errors: [
+          {
+            field: "body",
+            message: "bookName, authorName and isbn are required",
+          },
+        ],
+      });
+    }
+
+    const book = await bookService.update(
+      id,
+      {
+        bookName: fields.bookName,
+        authorName: fields.authorName,
+        isbn: fields.isbn,
+      },
+      coverFile,
+    );
+
     updateLogger.info({ bookId: book.id }, "book updated");
     return reply.send({ data: book });
   },
@@ -64,6 +327,10 @@ export const bookController = {
     request: FastifyRequest<{ Params: BookParam }>,
     reply: FastifyReply,
   ) {
+    // delete cover file if exists
+    const book = await bookService.findById(request.params.id);
+    if (book?.coverFile) await deleteFile(book.coverFile);
+
     await bookService.delete(request.params.id);
     deleteLogger.info({ bookId: request.params.id }, "book deleted");
     return reply.code(204).send();
