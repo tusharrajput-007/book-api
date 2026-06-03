@@ -58,6 +58,10 @@ export const bookService = {
   },
 
   async update(id: number, data: BookBody, coverFile?: string) {
+    const prevBook = await prisma.book.findUnique({
+      where: { id },
+    });
+
     return prisma.book.update({
       where: { id },
       data: {

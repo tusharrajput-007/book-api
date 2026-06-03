@@ -11,7 +11,7 @@ export const issueBodySchema = z.object({
     .number({ message: "Student ID is required" })
     .int()
     .positive("Student ID must be a positive number"),
-  issueDate: z.string().min(1, "Issue date is required"),
+  issueDate: z.coerce.date({ message: "Issue date must be a valid date" }),
 });
 
 // schema for id param

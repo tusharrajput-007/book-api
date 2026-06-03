@@ -58,7 +58,7 @@ export const issueService = {
       data: {
         bookId: data.bookId,
         studentId: data.studentId,
-        issueDate: new Date(data.issueDate),
+        issueDate: data.issueDate,
       },
       include: issueInclude,
     });

@@ -1,4 +1,5 @@
 import pino from "pino";
+import type { TransportTargetOptions } from "pino";
 import fs from "fs";
 import path from "path";
 import { env } from "../config/env";
@@ -10,28 +11,31 @@ export const createModuleLogger = (moduleName: string) => {
 
   const logFile = path.join(logDir, "log.txt");
 
+  const fileTarget: TransportTargetOptions = {
+    target: "pino/file",
+    options: { destination: logFile },
+    level: "debug",
+  };
+
+  const terminalTarget: TransportTargetOptions =
+    env.NODE_ENV !== "production"
+      ? {
+          target: "pino-pretty",
+          options: {
+            colorize: true,
+            translateTime: "SYS:standard",
+            ignore: "pid,hostname",
+          },
+          level: "debug",
+        }
+      : {
+          target: "pino/file",
+          options: { destination: 1 },
+          level: "info",
+        };
+
   const transport = pino.transport({
-    targets: [
-      // Terminal logging
-      {
-        target: env.NODE_ENV !== "production" ? "pino-pretty" : "pino/file",
-        options:
-          env.NODE_ENV !== "production"
-            ? {
-                colorize: true,
-                translateTime: "SYS:standard",
-                ignore: "pid,hostname",
-              }
-            : { destination: 1 },
-        level: env.NODE_ENV !== "production" ? "debug" : "info",
-      },
-      // File logging
-      {
-        target: "pino/file",
-        options: { destination: logFile } as unknown as { destination: number },
-        level: "debug",
-      },
-    ],
+    targets: [terminalTarget, fileTarget],
   });
 
   return pino(

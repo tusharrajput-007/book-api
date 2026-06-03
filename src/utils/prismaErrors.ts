@@ -9,9 +9,14 @@ export const handlePrismaError = (err: unknown, reply: FastifyReply) => {
         // Unique constraint violation
         const field =
           (prismaErr.meta?.target as string)?.split("_")[1] ?? "field";
+        const message = `${field} already exists`;
         return reply.code(409).send({
           success: false,
-          message: `${field} already exists`,
+          message,
+          error: {
+            code: "CONFLICT",
+            message,
+          },
         });
       }
       case "P2025": {
@@ -19,6 +24,10 @@ export const handlePrismaError = (err: unknown, reply: FastifyReply) => {
         return reply.code(404).send({
           success: false,
           message: "Not found",
+          error: {
+            code: "NOT_FOUND",
+            message: "Not found",
+          },
         });
       }
       case "P2003": {
@@ -26,6 +35,10 @@ export const handlePrismaError = (err: unknown, reply: FastifyReply) => {
         return reply.code(400).send({
           success: false,
           message: "Related record not found",
+          error: {
+            code: "BAD_REQUEST",
+            message: "Related record not found",
+          },
         });
       }
       default: {

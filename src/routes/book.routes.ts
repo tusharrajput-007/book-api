@@ -1,39 +1,12 @@
 import { FastifyPluginAsync } from "fastify";
 import { ZodTypeProvider } from "fastify-type-provider-zod";
 import { bookController } from "../controllers/book.controller";
-import {
-  bookParamSchema,
-  bookSchema,
-  bookQuerySchema,
-} from "../schemas/book.schema";
+import { bookParamSchema, bookQuerySchema } from "../schemas/book.schema";
 import { authenticate } from "../plugins/authenticate";
 import { z } from "zod";
 
 export const bookRoutes: FastifyPluginAsync = async (app) => {
   const server = app.withTypeProvider<ZodTypeProvider>();
-
-  // GET /books
-  server.get(
-    "/",
-    {
-      preHandler: authenticate,
-      schema: {
-        querystring: bookQuerySchema,
-        response: {
-          200: z.object({
-            data: z.array(bookSchema),
-            meta: z.object({
-              page: z.number(),
-              limit: z.number(),
-              total: z.number(),
-              totalPages: z.number(),
-            }),
-          }),
-        },
-      },
-    },
-    bookController.getAll,
-  );
 
   // GET /books/export.xlsx
   server.get(
@@ -41,9 +14,7 @@ export const bookRoutes: FastifyPluginAsync = async (app) => {
     {
       preHandler: authenticate,
       schema: {
-        querystring: z.object({
-          search: z.string().optional(),
-        }),
+        querystring: z.object({ search: z.string().optional() }),
       },
     },
     bookController.exportXlsx,
@@ -55,12 +26,31 @@ export const bookRoutes: FastifyPluginAsync = async (app) => {
     {
       preHandler: authenticate,
       schema: {
-        querystring: z.object({
-          search: z.string().optional(),
-        }),
+        querystring: z.object({ search: z.string().optional() }),
       },
     },
     bookController.exportCsv,
+  );
+
+  // GET /books
+  server.get(
+    "/",
+    {
+      preHandler: authenticate,
+      schema: {
+        querystring: bookQuerySchema,
+      },
+    },
+    bookController.getAll,
+  );
+
+  // GET /books/:id/cover
+  server.get(
+    "/:id/cover",
+    {
+      schema: { params: bookParamSchema },
+    },
+    bookController.getCover,
   );
 
   // GET /books/:id/details.pdf
@@ -68,9 +58,7 @@ export const bookRoutes: FastifyPluginAsync = async (app) => {
     "/:id/details.pdf",
     {
       preHandler: authenticate,
-      schema: {
-        params: bookParamSchema,
-      },
+      schema: { params: bookParamSchema },
     },
     bookController.exportPdf,
   );
@@ -80,23 +68,9 @@ export const bookRoutes: FastifyPluginAsync = async (app) => {
     "/:id",
     {
       preHandler: authenticate,
-      schema: {
-        params: bookParamSchema,
-        response: { 200: z.object({ data: bookSchema }) },
-      },
+      schema: { params: bookParamSchema },
     },
     bookController.getById,
-  );
-
-  // GET /books/:id/cover
-  server.get(
-    "/:id/cover",
-    {
-      schema: {
-        params: bookParamSchema,
-      },
-    },
-    bookController.getCover,
   );
 
   // POST /books - multipart, no body schema
@@ -108,14 +82,12 @@ export const bookRoutes: FastifyPluginAsync = async (app) => {
     bookController.create,
   );
 
-  // PUT /books/:id - multipart
+  // PUT /books/:id - multipart, no body schema
   server.put(
     "/:id",
     {
       preHandler: authenticate,
-      schema: {
-        params: bookParamSchema,
-      },
+      schema: { params: bookParamSchema },
     },
     bookController.update,
   );
@@ -125,10 +97,7 @@ export const bookRoutes: FastifyPluginAsync = async (app) => {
     "/:id",
     {
       preHandler: authenticate,
-      schema: {
-        params: bookParamSchema,
-        response: { 204: z.object({}) },
-      },
+      schema: { params: bookParamSchema },
     },
     bookController.delete,
   );

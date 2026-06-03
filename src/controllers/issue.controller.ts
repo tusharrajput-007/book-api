@@ -17,7 +17,8 @@ export const issueController = {
       { count: result.data.length, page: result.meta.page },
       "fetched all issues",
     );
-    return reply.send(result);
+    // return reply.ok(result);
+    return reply.send({ success: true, ...result });
   },
 
   async create(
@@ -29,7 +30,7 @@ export const issueController = {
       { issueId: issue.id, bookId: issue.book.id, studentId: issue.student.id },
       "issue created",
     );
-    return reply.code(201).send({ data: issue });
+    return reply.ok(issue, 201);
   },
 
   async returnBook(
@@ -41,6 +42,6 @@ export const issueController = {
       { issueId: issue.id, bookId: issue.book.id },
       "book returned",
     );
-    return reply.send({ data: issue });
+    return reply.ok(issue);
   },
 };

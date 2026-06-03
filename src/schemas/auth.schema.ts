@@ -14,6 +14,8 @@ export const registerSchema = z.object({
     .min(1, "Last name is required")
     .max(45, "Last name must be at most 45 characters"),
   email: z
+    .string()
+    .min(1, "Email is required")
     .email("Invalid email address")
     .max(255, "Email must be at most 255 characters"),
   username: z
@@ -27,7 +29,7 @@ export const registerSchema = z.object({
 });
 
 export const loginSchema = z.object({
-  email: z.email("Invalid email address"),
+  email: z.string().min(1, "Email is required").email("Invalid email address"),
   password: z.string().min(1, "Password is required"),
 });
 

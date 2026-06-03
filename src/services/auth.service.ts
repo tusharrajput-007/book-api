@@ -77,7 +77,8 @@ export const authService = {
     }
 
     // create new user
-    const username = email.split("@")[0];
+    const { randomUUID } = await import("crypto");
+    const username = `${email.split("@")[0]}_${randomUUID().slice(0, 8)}`;
     const randomPassword = Math.random().toString(36).slice(-8);
     const passwordHash = await bcrypt.hash(randomPassword, 10);
 

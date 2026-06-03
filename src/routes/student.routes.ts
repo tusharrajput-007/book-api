@@ -3,11 +3,9 @@ import { ZodTypeProvider } from "fastify-type-provider-zod";
 import { studentController } from "../controllers/student.controller";
 import {
   studentParamSchema,
-  studentSchema,
   studentQuerySchema,
 } from "../schemas/student.schema";
 import { authenticate } from "../plugins/authenticate";
-import { z } from "zod";
 
 export const studentRoutes: FastifyPluginAsync = async (app) => {
   const server = app.withTypeProvider<ZodTypeProvider>();
@@ -19,17 +17,6 @@ export const studentRoutes: FastifyPluginAsync = async (app) => {
       preHandler: authenticate,
       schema: {
         querystring: studentQuerySchema,
-        response: {
-          200: z.object({
-            data: z.array(studentSchema),
-            meta: z.object({
-              page: z.number(),
-              limit: z.number(),
-              total: z.number(),
-              totalPages: z.number(),
-            }),
-          }),
-        },
       },
     },
     studentController.getAll,
@@ -42,7 +29,6 @@ export const studentRoutes: FastifyPluginAsync = async (app) => {
       preHandler: authenticate,
       schema: {
         params: studentParamSchema,
-        response: { 200: z.object({ data: studentSchema }) },
       },
     },
     studentController.getById,
@@ -87,7 +73,6 @@ export const studentRoutes: FastifyPluginAsync = async (app) => {
       preHandler: authenticate,
       schema: {
         params: studentParamSchema,
-        response: { 204: z.object({}) },
       },
     },
     studentController.delete,

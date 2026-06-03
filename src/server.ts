@@ -1,5 +1,5 @@
-import "dotenv/config";
-import Fastify from "fastify";
+import { env } from "./config/env";
+import Fastify, { FastifyReply } from "fastify";
 import cors from "@fastify/cors";
 import jwt from "@fastify/jwt";
 import {
@@ -7,7 +7,6 @@ import {
   validatorCompiler,
   ZodTypeProvider,
 } from "fastify-type-provider-zod";
-import { env } from "./config/env";
 import { loggerConfig } from "./plugins/logger";
 import { errorHandler } from "./plugins/errorHandler";
 import { authRoutes } from "./routes/auth.routes";
@@ -24,6 +23,14 @@ const app = Fastify({
 // connecting fastify to zod. setting zod as validator and serializer
 app.setValidatorCompiler(validatorCompiler);
 app.setSerializerCompiler(serializerCompiler);
+
+// decorate reply with ok() for consistent success responses
+app.decorateReply(
+  "ok",
+  function (this: FastifyReply, data: unknown, code: number = 200) {
+    return this.code(code).send({ success: true, data });
+  },
+);
 
 // plugins
 app.register(cors, {
@@ -71,7 +78,10 @@ app.setNotFoundHandler((request, reply) => {
   request.log.warn({ url: request.url }, "route not found");
   return reply.code(404).send({
     success: false,
-    message: "Not found",
+    error: {
+      code: "NOT_FOUND",
+      message: "Not found",
+    },
   });
 });
 

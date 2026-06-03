@@ -1,6 +1,10 @@
 import { FastifyRequest, FastifyReply } from "fastify";
 import { studentService } from "../services/student.service";
-import { StudentParam, StudentQuery } from "../schemas/student.schema";
+import {
+  studentBodySchema,
+  StudentParam,
+  StudentQuery,
+} from "../schemas/student.schema";
 import { createModuleLogger } from "../utils/logger";
 import { saveFile, deleteFile } from "../utils/fileUpload";
 
@@ -20,7 +24,8 @@ export const studentController = {
       { count: result.data.length, page: result.meta.page },
       "fetched all students",
     );
-    return reply.send(result);
+    // return reply.ok(result);
+    return reply.send({ success: true, ...result });
   },
 
   async getById(
@@ -30,24 +35,35 @@ export const studentController = {
     const student = await studentService.findById(request.params.id);
     if (!student) {
       getByIdLogger.warn({ id: request.params.id }, "student not found");
-      return reply.code(404).send({ success: false, message: "Not found" });
+      return reply.code(404).send({
+        success: false,
+        message: "Not found",
+        error: { code: "NOT_FOUND", message: "Not found" },
+      });
     }
     getByIdLogger.info({ studentId: student.id }, "fetched student by id");
-    return reply.send({ data: student });
+    return reply.ok(student);
   },
 
+  // getPhoto
   async getPhoto(
     request: FastifyRequest<{ Params: StudentParam }>,
     reply: FastifyReply,
   ) {
     const student = await studentService.findById(request.params.id);
     if (!student) {
-      return reply.code(404).send({ success: false, message: "Not found" });
+      return reply.code(404).send({
+        success: false,
+        message: "Not found",
+        error: { code: "NOT_FOUND", message: "Not found" },
+      });
     }
     if (!student.photoFile) {
-      return reply
-        .code(404)
-        .send({ success: false, message: "This student has no photo" });
+      return reply.code(404).send({
+        success: false,
+        message: "This student has no photo",
+        error: { code: "NOT_FOUND", message: "This student has no photo" },
+      });
     }
 
     const { createReadStream } = await import("fs");
@@ -81,45 +97,17 @@ export const studentController = {
       }
     }
 
-    // validate required fields
-    if (
-      !fields.name ||
-      !fields.rollNo ||
-      !fields.phoneNo ||
-      !fields.country ||
-      !fields.state ||
-      !fields.city
-    ) {
-      return reply.code(400).send({
-        success: false,
-        message: "Validation failed",
-        errors: [
-          {
-            field: "body",
-            message:
-              "name, rollNo, phoneNo, country, state and city are required",
-          },
-        ],
-      });
-    }
+    // validate fields using Zod schema
+    const parsed = studentBodySchema.safeParse(fields);
+    if (!parsed.success) throw parsed.error;
 
-    const student = await studentService.create(
-      {
-        name: fields.name,
-        rollNo: fields.rollNo,
-        phoneNo: fields.phoneNo,
-        country: fields.country,
-        state: fields.state,
-        city: fields.city,
-      },
-      photoFile,
-    );
+    const student = await studentService.create(parsed.data, photoFile);
 
     createLogger.info(
       { studentId: student.id, name: student.name },
       "student created",
     );
-    return reply.code(201).send({ data: student });
+    return reply.ok(student, 201);
   },
 
   async update(
@@ -132,7 +120,11 @@ export const studentController = {
     const existing = await studentService.findById(id);
     if (!existing) {
       updateLogger.warn({ id }, "student not found for update");
-      return reply.code(404).send({ success: false, message: "Not found" });
+      return reply.code(404).send({
+        success: false,
+        message: "Not found",
+        error: { code: "NOT_FOUND", message: "Not found" },
+      });
     }
 
     const fields: Record<string, string> = {};
@@ -153,43 +145,14 @@ export const studentController = {
       }
     }
 
-    // validate required fields
-    if (
-      !fields.name ||
-      !fields.rollNo ||
-      !fields.phoneNo ||
-      !fields.country ||
-      !fields.state ||
-      !fields.city
-    ) {
-      return reply.code(400).send({
-        success: false,
-        message: "Validation failed",
-        errors: [
-          {
-            field: "body",
-            message:
-              "name, rollNo, phoneNo, country, state and city are required",
-          },
-        ],
-      });
-    }
+    // validate fields using Zod schema
+    const parsed = studentBodySchema.safeParse(fields);
+    if (!parsed.success) throw parsed.error;
 
-    const student = await studentService.update(
-      id,
-      {
-        name: fields.name,
-        rollNo: fields.rollNo,
-        phoneNo: fields.phoneNo,
-        country: fields.country,
-        state: fields.state,
-        city: fields.city,
-      },
-      photoFile,
-    );
+    const student = await studentService.update(id, parsed.data, photoFile);
 
     updateLogger.info({ studentId: student.id }, "student updated");
-    return reply.send({ data: student });
+    return reply.ok(student);
   },
 
   async delete(

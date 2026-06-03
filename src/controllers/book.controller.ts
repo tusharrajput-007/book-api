@@ -1,6 +1,6 @@
 import { FastifyRequest, FastifyReply } from "fastify";
 import { bookService } from "../services/book.service";
-import { BookParam, BookQuery } from "../schemas/book.schema";
+import { bookBodySchema, BookParam, BookQuery } from "../schemas/book.schema";
 import { createModuleLogger } from "../utils/logger";
 import { saveFile, deleteFile } from "../utils/fileUpload";
 
@@ -20,7 +20,8 @@ export const bookController = {
       { count: result.data.length, page: result.meta.page },
       "fetched all books",
     );
-    return reply.send(result);
+    // return reply.ok(result);
+    return reply.send({ success: true, ...result });
   },
 
   async getById(
@@ -30,24 +31,35 @@ export const bookController = {
     const book = await bookService.findById(request.params.id);
     if (!book) {
       getByIdLogger.warn({ id: request.params.id }, "book not found");
-      return reply.code(404).send({ success: false, message: "Not found" });
+      return reply.code(404).send({
+        success: false,
+        message: "Not found",
+        error: { code: "NOT_FOUND", message: "Not found" },
+      });
     }
     getByIdLogger.info({ bookId: book.id }, "fetched book by id");
-    return reply.send({ data: book });
+    return reply.ok(book);
   },
 
+  // getCover
   async getCover(
     request: FastifyRequest<{ Params: BookParam }>,
     reply: FastifyReply,
   ) {
     const book = await bookService.findById(request.params.id);
     if (!book) {
-      return reply.code(404).send({ success: false, message: "Not found" });
+      return reply.code(404).send({
+        success: false,
+        message: "Not found",
+        error: { code: "NOT_FOUND", message: "Not found" },
+      });
     }
     if (!book.coverFile) {
-      return reply
-        .code(404)
-        .send({ success: false, message: "This book has no cover" });
+      return reply.code(404).send({
+        success: false,
+        message: "This book has no cover",
+        error: { code: "NOT_FOUND", message: "This book has no cover" },
+      });
     }
 
     const { createReadStream } = await import("fs");
@@ -62,6 +74,7 @@ export const bookController = {
     return reply.send(createReadStream(book.coverFile));
   },
 
+  // exportXlsx
   async exportXlsx(
     request: FastifyRequest<{ Querystring: { search?: string } }>,
     reply: FastifyReply,
@@ -73,7 +86,6 @@ export const bookController = {
     const workbook = new ExcelJS.default.Workbook();
     const sheet = workbook.addWorksheet("Books");
 
-    // define columns
     sheet.columns = [
       { header: "Id", key: "id", width: 10 },
       { header: "Book Name", key: "bookName", width: 30 },
@@ -82,7 +94,6 @@ export const bookController = {
       { header: "Created At", key: "createdAt", width: 25 },
     ];
 
-    // add rows
     sheet.addRows(
       books.map((book: any) => ({
         id: book.id,
@@ -93,20 +104,17 @@ export const bookController = {
       })),
     );
 
-    // response headers
     reply.header(
       "Content-Type",
       "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     );
     reply.header("Content-Disposition", 'attachment; filename="books.xlsx"');
 
-    // // stream workbook to response
-    // await workbook.xlsx.write(reply.raw);
-    // reply.raw.end();
     const buffer = await workbook.xlsx.writeBuffer();
     return reply.send(buffer);
   },
 
+  // exportCsv
   async exportCsv(
     request: FastifyRequest<{ Querystring: { search?: string } }>,
     reply: FastifyReply,
@@ -126,10 +134,8 @@ export const bookController = {
       columns: ["Id", "Book Name", "Author Name", "ISBN", "Created At"],
     });
 
-    // pipe stringifier through passthrough to reply
     stringifier.pipe(pass);
 
-    // write each book as a row
     books.forEach((book: any) => {
       stringifier.write({
         Id: book.id,
@@ -145,13 +151,18 @@ export const bookController = {
     return reply.send(pass);
   },
 
+  // exportPdf
   async exportPdf(
     request: FastifyRequest<{ Params: BookParam }>,
     reply: FastifyReply,
   ) {
     const book = await bookService.findById(request.params.id);
     if (!book) {
-      return reply.code(404).send({ success: false, message: "Not found" });
+      return reply.code(404).send({
+        success: false,
+        message: "Not found",
+        error: { code: "NOT_FOUND", message: "Not found" },
+      });
     }
 
     const PDFDocument = (await import("pdfkit")).default;
@@ -163,7 +174,6 @@ export const bookController = {
       `attachment; filename="book-${book.id}.pdf"`,
     );
 
-    // collect PDF into buffer
     const chunks: Buffer[] = [];
     doc.on("data", (chunk: Buffer) => chunks.push(chunk));
 
@@ -171,17 +181,14 @@ export const bookController = {
       doc.on("end", resolve);
       doc.on("error", reject);
 
-      // title
       doc
         .fontSize(24)
         .font("Helvetica-Bold")
         .text("BOOK DETAILS", { align: "center" })
         .moveDown();
 
-      // divider line
       doc.moveTo(50, doc.y).lineTo(545, doc.y).stroke().moveDown();
 
-      // cover image if exists
       if (book.coverFile) {
         const pageWidth = 595;
         const imgWidth = 200;
@@ -190,10 +197,8 @@ export const bookController = {
         doc.moveDown(18);
       }
 
-      // divider line
       doc.moveTo(50, doc.y).lineTo(545, doc.y).stroke().moveDown();
 
-      // book details
       doc.fontSize(12).font("Helvetica");
 
       doc.font("Helvetica-Bold").text("Book Name: ", { continued: true });
@@ -219,14 +224,11 @@ export const bookController = {
     const fields: Record<string, string> = {};
     let coverFile: string | undefined;
 
-    // iterate over all multipart parts
     for await (const part of request.parts()) {
       if (part.type === "file") {
-        // only process if a file was actually selected
         if (part.fieldname === "coverImage" && part.filename) {
           coverFile = await saveFile(part, "books");
         } else {
-          // drain empty file fields to prevent hanging
           await part.toBuffer();
         }
       } else {
@@ -234,34 +236,17 @@ export const bookController = {
       }
     }
 
-    // validate required fields
-    if (!fields.bookName || !fields.authorName || !fields.isbn) {
-      return reply.code(400).send({
-        success: false,
-        message: "Validation failed",
-        errors: [
-          {
-            field: "body",
-            message: "bookName, authorName and isbn are required",
-          },
-        ],
-      });
-    }
+    // validate fields using Zod schema
+    const parsed = bookBodySchema.safeParse(fields);
+    if (!parsed.success) throw parsed.error;
 
-    const book = await bookService.create(
-      {
-        bookName: fields.bookName,
-        authorName: fields.authorName,
-        isbn: fields.isbn,
-      },
-      coverFile,
-    );
+    const book = await bookService.create(parsed.data, coverFile);
 
     createLogger.info(
       { bookId: book.id, authorName: book.authorName },
       "book created",
     );
-    return reply.code(201).send({ data: book });
+    return reply.ok(book, 201);
   },
 
   async update(
@@ -270,21 +255,22 @@ export const bookController = {
   ) {
     const { id } = request.params;
 
-    // check if book exists
     const existing = await bookService.findById(id);
     if (!existing) {
       updateLogger.warn({ id }, "book not found for update");
-      return reply.code(404).send({ success: false, message: "Not found" });
+      return reply.code(404).send({
+        success: false,
+        message: "Not found",
+        error: { code: "NOT_FOUND", message: "Not found" },
+      });
     }
 
     const fields: Record<string, string> = {};
     let coverFile: string | undefined;
 
-    // iterate over all multipart parts
     for await (const part of request.parts()) {
       if (part.type === "file") {
         if (part.fieldname === "coverImage" && part.filename) {
-          // delete old cover if exists
           if (existing.coverFile) await deleteFile(existing.coverFile);
           coverFile = await saveFile(part, "books");
         } else {
@@ -295,39 +281,20 @@ export const bookController = {
       }
     }
 
-    // validate required fields
-    if (!fields.bookName || !fields.authorName || !fields.isbn) {
-      return reply.code(400).send({
-        success: false,
-        message: "Validation failed",
-        errors: [
-          {
-            field: "body",
-            message: "bookName, authorName and isbn are required",
-          },
-        ],
-      });
-    }
+    // validate fields using Zod schema
+    const parsed = bookBodySchema.safeParse(fields);
+    if (!parsed.success) throw parsed.error;
 
-    const book = await bookService.update(
-      id,
-      {
-        bookName: fields.bookName,
-        authorName: fields.authorName,
-        isbn: fields.isbn,
-      },
-      coverFile,
-    );
+    const book = await bookService.update(id, parsed.data, coverFile);
 
     updateLogger.info({ bookId: book.id }, "book updated");
-    return reply.send({ data: book });
+    return reply.ok(book);
   },
 
   async delete(
     request: FastifyRequest<{ Params: BookParam }>,
     reply: FastifyReply,
   ) {
-    // delete cover file if exists
     const book = await bookService.findById(request.params.id);
     if (book?.coverFile) await deleteFile(book.coverFile);
 

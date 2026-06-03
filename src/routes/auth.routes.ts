@@ -1,13 +1,8 @@
 import { FastifyPluginAsync } from "fastify";
 import { ZodTypeProvider } from "fastify-type-provider-zod";
 import { authController } from "../controllers/auth.controller";
-import {
-  registerSchema,
-  loginSchema,
-  userResponseSchema,
-} from "../schemas/auth.schema";
+import { registerSchema, loginSchema } from "../schemas/auth.schema";
 import { authenticate } from "../plugins/authenticate";
-import { z } from "zod";
 
 export const authRoutes: FastifyPluginAsync = async (app) => {
   const server = app.withTypeProvider<ZodTypeProvider>();
@@ -18,9 +13,6 @@ export const authRoutes: FastifyPluginAsync = async (app) => {
     {
       schema: {
         body: registerSchema,
-        response: {
-          201: z.object({ data: userResponseSchema }),
-        },
       },
     },
     authController.register,
@@ -32,14 +24,6 @@ export const authRoutes: FastifyPluginAsync = async (app) => {
     {
       schema: {
         body: loginSchema,
-        response: {
-          200: z.object({
-            data: z.object({
-              token: z.string(),
-              user: userResponseSchema,
-            }),
-          }),
-        },
       },
     },
     authController.login,
@@ -50,21 +34,10 @@ export const authRoutes: FastifyPluginAsync = async (app) => {
     "/me",
     {
       preHandler: authenticate,
-      schema: {
-        response: {
-          200: z.object({ data: userResponseSchema }),
-        },
-      },
     },
     authController.me,
   );
 
   // GET /auth/google/callback - google redirects here after user approves
-  server.get(
-    "/google/callback",
-    {
-      schema: {},
-    },
-    authController.googleCallback,
-  );
+  server.get("/google/callback", {}, authController.googleCallback);
 };

@@ -18,7 +18,7 @@ export const authController = {
       { userId: user.id, email: user.email },
       "user registered",
     );
-    return reply.code(201).send({ data: user });
+    return reply.ok(user, 201);
   },
 
   async login(
@@ -31,6 +31,10 @@ export const authController = {
       return reply.code(401).send({
         success: false,
         message: "Invalid credentials",
+        error: {
+          code: "UNAUTHORIZED",
+          message: "Invalid credentials",
+        },
       });
     }
 
@@ -41,16 +45,14 @@ export const authController = {
     );
 
     loginLogger.info({ userId: user.id }, "user logged in");
-    return reply.send({
-      data: {
-        token,
-        user: {
-          id: user.id,
-          firstName: user.firstName,
-          lastName: user.lastName,
-          email: user.email,
-          username: user.username,
-        },
+    return reply.ok({
+      token,
+      user: {
+        id: user.id,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        email: user.email,
+        username: user.username,
       },
     });
   },
@@ -59,10 +61,17 @@ export const authController = {
     const user = await authService.findById(request.user.sub);
     if (!user) {
       meLogger.warn({ userId: request.user.sub }, "user not found");
-      return reply.code(404).send({ success: false, message: "Not found" });
+      return reply.code(404).send({
+        success: false,
+        message: "Not found",
+        error: {
+          code: "NOT_FOUND",
+          message: "Not found",
+        },
+      });
     }
     meLogger.info({ userId: user.id }, "fetched current user");
-    return reply.send({ data: user });
+    return reply.ok(user);
   },
 
   async googleCallback(request: FastifyRequest, reply: FastifyReply) {
