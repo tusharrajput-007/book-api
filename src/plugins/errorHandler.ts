@@ -31,7 +31,9 @@ export const errorHandler = (
 
   // Zod validation error: so if anything is wrong with the incoming request, zod automatically sends it here as 400
   if (fastifyErr.statusCode === 400) {
-    const errors = ((fastifyErr as any).validation ?? []).map((e: any) => ({
+    const validation = (fastifyErr as any).validation ?? [];
+
+    const errors = validation.map((e: any) => ({
       field:
         e.instancePath.replace("/", "") ||
         e.params?.missingProperty ||
@@ -41,7 +43,7 @@ export const errorHandler = (
 
     return reply.code(400).send({
       success: false,
-      message: "Validation failed",
+      message: errors.length > 0 ? errors[0].message : "Validation failed",
       errors,
     });
   }
