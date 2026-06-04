@@ -31,13 +31,23 @@ export const handlePrismaError = (err: unknown, reply: FastifyReply) => {
         });
       }
       case "P2003": {
-        // Foreign key constraint violation
-        return reply.code(400).send({
+        // Foreign key constraint violation — record is referenced by another table
+        const field = (prismaErr.meta?.field_name as string) ?? "";
+        const isBook = field.toLowerCase().includes("book");
+        const isStudent = field.toLowerCase().includes("student");
+
+        const message = isBook
+          ? "Book is currently issued and cannot be deleted"
+          : isStudent
+            ? "Student has an active issue and cannot be deleted"
+            : "Record is referenced by another entry and cannot be deleted";
+
+        return reply.code(409).send({
           success: false,
-          message: "Related record not found",
+          message,
           error: {
-            code: "BAD_REQUEST",
-            message: "Related record not found",
+            code: "CONFLICT",
+            message,
           },
         });
       }
