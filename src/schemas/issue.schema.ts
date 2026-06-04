@@ -11,7 +11,19 @@ export const issueBodySchema = z.object({
     .number({ message: "Student ID is required" })
     .int()
     .positive("Student ID must be a positive number"),
-  issueDate: z.coerce.date({ message: "Issue date must be a valid date" }),
+  issueDate: z.coerce
+    .date({ message: "Issue date must be a valid date" })
+    .refine(
+      (date) => {
+        const today = new Date();
+        return (
+          date.getFullYear() === today.getFullYear() &&
+          date.getMonth() === today.getMonth() &&
+          date.getDate() === today.getDate()
+        );
+      },
+      { message: "Issue date must be today's date" },
+    ),
 });
 
 // schema for id param
